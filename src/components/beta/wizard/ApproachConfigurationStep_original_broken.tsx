@@ -1,0 +1,1154 @@
+'use client';
+
+import React, { useState, useEffect, useCallback } from 'react';
+import { 
+  ChartBarIcon,
+  Cog6ToothIcon,
+  ExclamationTriangleIcon,
+  InformationCircleIcon,
+  ArrowPathIcon
+} from '@heroicons/react/24/outline';
+import { BetaZoneChart } from './BetaZoneChart';
+import type { BetaConfig, CurrentProduct, HistoricalApproach, DynamicZoneDetectionConfig, ConvexityZone } from '../BetaCalibrationWizard';
+import { createDefaultZones, migrateLegacyZones } from '../BetaCalibrationWizard';
+import { api } from '@/lib/api';
+
+interface ApproachConfigurationStepProps {
+  config: BetaConfig;
+  updateConfig: (updates: Partial<BetaConfig>) => void;
+  currentProduct?: CurrentProduct;
+  disabled?: boolean;
+  onValidationChange?: (errors: string[]) => void;
+}
+
+export function ApproachConfigurationStep({
+  config,
+  updateConfig,
+  currentProduct,
+  disabled = false,
+  onValidationChange
+}: ApproachConfigurationStepProps) {
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [historicalData, setHistoricalData] = useState<any[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState(false);
+  const [chartDateRange, setChartDateRange] = useState({
+    startDate: '2020-03-01',
+    endDate: '2023-12-31'
+  });
+  const [tierSpecificZones, setTierSpecificZones] = useState(false);
+
+  // Use the exported API object
+
+  // Initialize historical config if not exists
+  useEffect(() => {
+    if (config.calibrationMethod === 'historical' && !config.historicalConfig) {
+      updateConfig({
+        historicalConfig: {
+          approach: 'zone_based',
+          methodology: 'simple_average',
+          timePeriod: { preset: 'last_2_years' },
+          excludeOutliers: false,
+          convexityZones: {
+            zoneStrategy: 'zones',
+            zones: createDefaultZones(3),
+            // Legacy support
+            lowToMidThreshold: 3.0,
+            midToHighThreshold: 5.0,
+            autoDetect: false
+          }
+        }
+      });
+    }
+    
+    // Migrate legacy configurations to new zone structure
+    if (config.calibrationMethod === 'historical' && config.historicalConfig?.convexityZones) {
+      const zones = config.historicalConfig.convexityZones;
+      if (!zones.zoneStrategy && !zones.zones && (zones.lowToMidThreshold || zones.midToHighThreshold)) {
+        // Migrate legacy configuration
+        const migratedZones = migrateLegacyZones(zones);
+        updateConfig({
+          historicalConfig: {
+            ...config.historicalConfig,
+            convexityZones: {
+              ...zones,
+              zoneStrategy: 'zones',
+              zones: migratedZones
+            }
+          }
+        });
+      }
+    }
+  }, [config.calibrationMethod, config.historicalConfig]);
+
+  // Validate configuration
+  useEffect(() => {
+    const errors: string[] = [];
+    
+    if (config.calibrationMethod === 'historical') {
+      const zoneStrategy = config.historicalConfig?.convexityZones?.zoneStrategy;
+      
+      if (!zoneStrategy && !config.historicalConfig?.approach) {
+        errors.push('Please select a convexity strategy');
+      }
+      
+      // Validate zone configuration
+      if (zoneStrategy === 'zones' || (!zoneStrategy && config.historicalConfig?.approach === 'zone_based')) {
+        const zones = config.historicalConfig?.convexityZones?.zones;
+        if (zones && zones.length > 1) {
+          // Validate thresholds are in ascending order
+          for (let i = 0; i < zones.length - 1; i++) {
+            const currentThreshold = zones[i].threshold;
+            const nextThreshold = zones[i + 1].threshold;
+            if (currentThreshold !== undefined && nextThreshold !== undefined && currentThreshold >= nextThreshold) {
+              errors.push(`Zone "${zones[i].name}" threshold (${currentThreshold}%) must be less than "${zones[i + 1].name}" threshold (${nextThreshold}%)`);
+            }
+          }
+        }
+        
+        // Legacy validation for backward compatibility
+        if (config.historicalConfig?.convexityZones?.autoDetect === false) {
+          const convexityZones = config.historicalConfig.convexityZones;
+          if (convexityZones.lowToMidThreshold && convexityZones.midToHighThreshold &&
+              Number(convexityZones.lowToMidThreshold) >= Number(convexityZones.midToHighThreshold)) {
+            errors.push('Low→Mid threshold must be less than Mid→High threshold');
+          }
+        }
+      }
+    }
+    
+    if (config.calibrationMethod === 'inherit' && !config.inheritanceConfig?.sourceProductId) {
+      errors.push('Please select source product for inheritance');
+    }
+
+    setValidationErrors(errors);
+    onValidationChange?.(errors);
+  }, [config, onValidationChange]);
+
+  // Fetch historical data for chart visualization
+  useEffect(() => {
+    const fetchHistoricalData = async () => {
+      if (currentProduct) { // Remove the calibrationMethod check so data loads for visualization
+        setIsLoadingData(true);
+        try {
+          // Try to fetch from API first
+          const data = await api.getHistoricalData({
+            bank: currentProduct.bank_code,
+            productType: 'instant_access_savings'
+          });
+          
+          console.log('Fetched historical data:', data);
+          
+          // If no data from API, use sample data based on current product
+          if (!data || data.length === 0) {
+            console.log('No API data found, using sample historical data for demonstration');
+            
+            // Generate sample historical data based on the current product
+            const sampleData = generateSampleHistoricalData(currentProduct);
+            setHistoricalData(sampleData);
+          } else {
+            setHistoricalData(data);
+          }
+        } catch (error) {
+          console.error('Failed to fetch historical data:', error);
+          
+          // Fallback to sample data for demonstration
+          const sampleData = generateSampleHistoricalData(currentProduct);
+          setHistoricalData(sampleData);
+        } finally {
+          setIsLoadingData(false);
+        }
+      }
+    };
+
+    fetchHistoricalData();
+  }, [config.calibrationMethod, currentProduct?.bank_code]);
+
+  // Generate sample historical data for demonstration with tier-specific evolution
+  const generateSampleHistoricalData = (product: any) => {
+    if (product.bank_code === 'LLOYDS' && product.product_name === 'Club Lloyds Current Account') {
+      // Use our imported Lloyds data structure with tier differentiation
+      return [
+        {
+          bank_code: 'LLOYDS',
+          product_name: 'Club Lloyds Current Account',
+          tier_rates: { 'Tier 1': 0.60, 'Tier 2': 1.20 }, // COVID-era with tier spread
+          effective_from: '2020-10-01',
+          effective_to: '2023-01-30',
+          source: 'sample_demo'
+        },
+        {
+          bank_code: 'LLOYDS', 
+          product_name: 'Club Lloyds Current Account',
+          tier_rates: { 'Tier 1': 1.00, 'Tier 2': 1.50 }, // Pre-COVID rates
+          effective_from: '2019-10-01',
+          effective_to: '2020-09-30',
+          source: 'sample_demo'
+        },
+        {
+          bank_code: 'LLOYDS',
+          product_name: 'Club Lloyds Current Account', 
+          tier_rates: { 'Tier 1': 1.25, 'Tier 2': 1.75 }, // Earlier period
+          effective_from: '2018-07-01',
+          effective_to: '2019-09-30',
+          source: 'sample_demo'
+        },
+        {
+          bank_code: 'LLOYDS',
+          product_name: 'Club Lloyds Current Account',
+          tier_rates: { 'Tier 1': 1.50, 'Tier 2': 2.25 }, // Higher rate period
+          effective_from: '2017-01-08',
+          effective_to: '2018-06-30',
+          source: 'sample_demo'
+        }
+      ];
+    }
+    
+    if (product.bank_code === 'BARCLAYS' && product.product_name === 'Rainy Day Saver') {
+      // Realistic historical evolution for Rainy Day Saver
+      return [
+        {
+          bank_code: 'BARCLAYS',
+          product_name: 'Rainy Day Saver',
+          tier_rates: { 'Tier 1': 1.05, 'Tier 2': 4.52 }, // Current rates (recent)
+          effective_from: '2023-03-01',
+          effective_to: '2023-12-31',
+          source: 'sample_demo'
+        },
+        {
+          bank_code: 'BARCLAYS',
+          product_name: 'Rainy Day Saver',
+          tier_rates: { 'Tier 1': 0.75, 'Tier 2': 3.20 }, // Lower during rate rises
+          effective_from: '2022-08-01',
+          effective_to: '2023-02-28',
+          source: 'sample_demo'
+        },
+        {
+          bank_code: 'BARCLAYS',
+          product_name: 'Rainy Day Saver',
+          tier_rates: { 'Tier 1': 0.25, 'Tier 2': 1.50 }, // COVID-era low rates
+          effective_from: '2020-06-01',
+          effective_to: '2022-07-31',
+          source: 'sample_demo'
+        }
+      ];
+    }
+    
+    // Default sample data for other products
+    return [
+      {
+        bank_code: product.bank_code,
+        product_name: product.product_name,
+        tier_rates: product.tiers?.reduce((acc: any, tier: any) => {
+          acc[tier.tier_name] = tier.rate * 0.6; // Historical baseline lower
+          return acc;
+        }, {}) || { 'Tier 1': 1.5 },
+        effective_from: '2022-01-01',
+        source: 'sample_demo'
+      }
+    ];
+  };
+
+  // Transform historical data for chart using BoE rate cycle from 2020 onwards
+  const transformDataForChart = useCallback(() => {
+    console.log('transformDataForChart called with:', { 
+      historicalDataLength: historicalData?.length || 0, 
+      currentProduct: currentProduct?.product_name 
+    });
+    
+    if (!historicalData || historicalData.length === 0 || !currentProduct) {
+      console.log('No historical data or current product, returning undefined');
+      return undefined; // Let chart use mock data
+    }
+
+    // Actual BoE base rate progression - filter by date range
+    const allBoeRateHistory = [
+      { date: '2020-03-19', rate: 0.10 }, // COVID emergency cut
+      { date: '2021-12-16', rate: 0.25 }, // First hike
+      { date: '2022-02-03', rate: 0.50 }, 
+      { date: '2022-03-17', rate: 0.75 },
+      { date: '2022-05-05', rate: 1.00 },
+      { date: '2022-06-16', rate: 1.25 },
+      { date: '2022-08-04', rate: 1.75 },
+      { date: '2022-09-22', rate: 2.25 },
+      { date: '2022-11-03', rate: 3.00 },
+      { date: '2022-12-15', rate: 3.50 },
+      { date: '2023-02-02', rate: 4.00 },
+      { date: '2023-03-23', rate: 4.25 },
+      { date: '2023-05-11', rate: 4.50 },
+      { date: '2023-06-22', rate: 5.00 },
+      { date: '2023-08-03', rate: 5.25 }, // Current rate
+    ];
+
+    // Filter BoE rate history by selected date range
+    const boeRateHistory = allBoeRateHistory.filter(entry => {
+      const entryDate = new Date(entry.date);
+      const startDate = new Date(chartDateRange.startDate);
+      const endDate = new Date(chartDateRange.endDate);
+      return entryDate >= startDate && entryDate <= endDate;
+    });
+
+    // Find the closest BoE rate for each historical product rate period
+    const getBoeRateForDate = (productDate: string): number => {
+      const targetDate = new Date(productDate);
+      
+      // Find the BoE rate that was in effect at this time
+      let applicableRate = 0.10; // Default to COVID low
+      
+      for (const boeEntry of boeRateHistory) {
+        const boeDate = new Date(boeEntry.date);
+        if (boeDate <= targetDate) {
+          applicableRate = boeEntry.rate;
+        } else {
+          break;
+        }
+      }
+      
+      return applicableRate;
+    };
+
+    // Function to get the applicable product tier rates for a given date
+    const getProductTierRatesForDate = (targetDate: string): Record<string, number> => {
+      const target = new Date(targetDate);
+      
+      // Find the historical rate entry that was effective at this date
+      for (const entry of historicalData) {
+        const effectiveFrom = new Date(entry.effective_from || entry.date);
+        const effectiveTo = entry.effective_to ? new Date(entry.effective_to) : new Date('2030-12-31');
+        
+        if (target >= effectiveFrom && target <= effectiveTo) {
+          // Return tier-specific rates if available, otherwise single rate for all tiers
+          if (entry.tier_rates) {
+            return entry.tier_rates;
+          } else {
+            // Legacy single rate - apply to all current tiers
+            const singleRate = parseFloat(entry.rate?.toString() || '0');
+            const tierRates: Record<string, number> = {};
+            currentProduct.tiers.forEach((tier: any) => {
+              tierRates[tier.tier_name] = singleRate;
+            });
+            return tierRates;
+          }
+        }
+      }
+      
+      // If no exact match, find the closest historical rate by date
+      const closest = historicalData.reduce((closest, current) => {
+        const currentDate = new Date(current.effective_from || current.date);
+        const closestDate = new Date(closest.effective_from || closest.date);
+        
+        return Math.abs(target.getTime() - currentDate.getTime()) < 
+               Math.abs(target.getTime() - closestDate.getTime()) ? current : closest;
+      });
+      
+      if (closest.tier_rates) {
+        return closest.tier_rates;
+      } else {
+        const singleRate = parseFloat(closest.rate?.toString() || '0');
+        const tierRates: Record<string, number> = {};
+        currentProduct.tiers.forEach((tier: any) => {
+          tierRates[tier.tier_name] = singleRate;
+        });
+        return tierRates;
+      }
+    };
+
+    // Create monthly time buckets from start to end date
+    const startDate = new Date(chartDateRange.startDate);
+    const endDate = new Date(chartDateRange.endDate);
+    const monthlyData = [];
+    
+    // Generate monthly buckets
+    const currentMonth = new Date(startDate);
+    while (currentMonth <= endDate) {
+      const monthKey = currentMonth.toISOString().substring(0, 7) + '-01'; // YYYY-MM-01
+      
+      // Get BoE rate for this month
+      const boeRate = getBoeRateForDate(monthKey);
+      
+      // Get historical tier rates for this month
+      const historicalTierRates = getProductTierRatesForDate(monthKey);
+      
+      // Create productRates array using actual historical tier rates
+      const productRates = currentProduct.tiers.map((tier, index) => {
+        const historicalRate = historicalTierRates[tier.tier_name] || 
+                               Object.values(historicalTierRates)[0] || 
+                               tier.rate * 0.6; // Fallback
+        
+        return {
+          tierName: tier.tier_name,
+          rate: parseFloat(Math.max(0.05, historicalRate).toFixed(2)),
+          confidence: 0.95
+        };
+      });
+      
+      monthlyData.push({
+        date: monthKey,
+        boeRate: boeRate,
+        productRates: productRates
+      });
+      
+      // Move to next month
+      currentMonth.setMonth(currentMonth.getMonth() + 1);
+    }
+    
+    const chartData = monthlyData;
+
+    const result = chartData.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    console.log('transformDataForChart returning chart data:', result.length, 'points');
+    console.log('Date range:', chartDateRange);
+    console.log('Sample data points:', result.slice(0, 3));
+    console.log('Historical data periods:', historicalData.map(h => ({ 
+      rate: h.rate, 
+      from: h.effective_from, 
+      to: h.effective_to 
+    })));
+    
+    // Log a few specific calculations for debugging
+    if (result.length > 0) {
+      console.log('March 2020 example calculation:');
+      const march2020 = result.find(r => r.date === '2020-03-19');
+      if (march2020) {
+        console.log('  BoE Rate:', march2020.boeRate, '%');
+        console.log('  Product Rates:', march2020.productRates);
+      }
+    }
+    
+    return result;
+  }, [historicalData, currentProduct, chartDateRange]);
+
+  // Handle approach selection
+  const selectApproach = useCallback((approach: HistoricalApproach) => {
+    updateConfig({
+      historicalConfig: {
+        ...config.historicalConfig!,
+        approach
+      }
+    });
+  }, [config.historicalConfig, updateConfig]);
+
+  // Handle zone threshold changes from chart
+  const handleZoneChange = useCallback((lowToMid: number, midToHigh: number) => {
+    updateConfig({
+      historicalConfig: {
+        ...config.historicalConfig!,
+        convexityZones: {
+          ...config.historicalConfig!.convexityZones!,
+          lowToMidThreshold: lowToMid,
+          midToHighThreshold: midToHigh
+        }
+      }
+    });
+  }, [config.historicalConfig, updateConfig]);
+
+  // Handle auto-detect toggle
+  const toggleAutoDetect = useCallback((autoDetect: boolean) => {
+    updateConfig({
+      historicalConfig: {
+        ...config.historicalConfig!,
+        convexityZones: {
+          ...config.historicalConfig!.convexityZones!,
+          autoDetect
+        }
+      }
+    });
+  }, [config.historicalConfig, updateConfig]);
+
+  // Handle through-cycle settings
+  const updateThroughCycleConfig = useCallback((updates: any) => {
+    updateConfig({
+      historicalConfig: {
+        ...config.historicalConfig!,
+        throughCycle: {
+          ...config.historicalConfig!.throughCycle,
+          ...updates
+        }
+      }
+    });
+  }, [config.historicalConfig, updateConfig]);
+
+  // Manual configuration (for manual method)
+  if (config.calibrationMethod === 'manual') {
+    // Initialize manual config if not exists
+    if (!config.manualConfig) {
+      updateConfig({
+        manualConfig: {
+          convexityZones: {
+            lowToMidThreshold: '2022-05-05',
+            midToHighThreshold: '2022-11-03'
+          }
+        }
+      });
+    }
+
+    return (
+      <div className="space-y-6">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <h4 className="text-blue-800 font-medium flex items-center">
+            <Cog6ToothIcon className="w-5 h-5 mr-2" />
+            Manual Configuration
+          </h4>
+          <p className="text-blue-700 text-sm mt-1">
+            Set convexity zones visually, then configure beta multipliers for each zone.
+          </p>
+        </div>
+
+        {/* Manual Zone Configuration with Chart */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <h4 className="text-lg font-semibold text-blue-900 mb-4 flex items-center">
+            <ChartBarIcon className="w-5 h-5 mr-2" />
+            Zone Configuration
+          </h4>
+          
+          <p className="text-blue-800 text-sm mb-4">
+            Use the chart to set optimal convexity zone boundaries for manual beta calibration.
+          </p>
+
+          {/* Beta Chart with Zone Visualization */}
+          <div className="bg-white rounded-lg border border-blue-300 p-4">
+            <BetaZoneChart
+              lowToMidThreshold={config.manualConfig?.convexityZones?.lowToMidThreshold || 3.0}
+              midToHighThreshold={config.manualConfig?.convexityZones?.midToHighThreshold || 5.0}
+              onThresholdChange={(lowToMid: number, midToHigh: number) => {
+                updateConfig({
+                  manualConfig: {
+                    ...config.manualConfig!,
+                    convexityZones: {
+                      ...config.manualConfig!.convexityZones!,
+                      lowToMidThreshold: lowToMid,
+                      midToHighThreshold: midToHigh
+                    }
+                  }
+                });
+              }}
+              onCommitZones={() => {
+                console.log('Manual zones committed:', {
+                  lowToMid: config.manualConfig?.convexityZones?.lowToMidThreshold,
+                  midToHigh: config.manualConfig?.convexityZones?.midToHighThreshold
+                });
+              }}
+              editable={true}
+              height={350}
+              currentTierRate={currentProduct?.tiers?.[0]?.rate || 4.5}
+            />
+          </div>
+
+          <div className="mt-4 bg-blue-100 border border-blue-300 rounded p-3">
+            <div className="flex items-start space-x-2">
+              <InformationCircleIcon className="w-4 h-4 text-blue-600 mt-0.5" />
+              <div className="text-xs text-blue-800">
+                <strong>Manual Zone Setting:</strong> Use the sliders to set zones based on where you see 
+                meaningful changes in rate sensitivity. These zones will be used for manual beta configuration 
+                in the next steps.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Inheritance configuration
+  if (config.calibrationMethod === 'inherit') {
+    return (
+      <div className="space-y-6">
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+          <h4 className="text-purple-800 font-medium">Inheritance Configuration</h4>
+          <p className="text-purple-700 text-sm mt-1">
+            Configure source product and tracking settings.
+          </p>
+          {/* TODO: Add inheritance configuration UI */}
+          <div className="mt-3 bg-yellow-100 border border-yellow-300 rounded p-3">
+            <p className="text-xs text-yellow-800">
+              🚧 Inheritance configuration UI coming in next iteration
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Historical configuration (main focus)
+  if (config.calibrationMethod !== 'historical') {
+    return null;
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Zone Strategy Selection */}
+      <div>
+        <h4 className="text-lg font-semibold text-gray-900 mb-3">Convexity Strategy</h4>
+        <p className="text-sm text-gray-600 mb-4">
+          Choose how to model rate sensitivity across different market conditions.
+        </p>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <button
+            onClick={() => updateConfig({
+              historicalConfig: {
+                ...config.historicalConfig!,
+                convexityZones: { zoneStrategy: 'none' }
+              }
+            })}
+            disabled={disabled}
+            className={`p-4 rounded-lg border-2 text-left transition-colors ${
+              config.historicalConfig?.convexityZones?.zoneStrategy === 'none'
+                ? 'border-gray-500 bg-gray-50'
+                : 'border-gray-200 hover:border-gray-300'
+            }`}
+          >
+            <div className="font-medium text-gray-800">No Zones</div>
+            <div className="text-xs text-gray-600 mt-1">
+              Single beta across all rate environments
+            </div>
+            <div className="mt-2 text-xs text-gray-700">
+              ✓ Simple, stable calibration
+            </div>
+          </button>
+          
+          <button
+            onClick={() => {
+              const existingZones = config.historicalConfig?.convexityZones?.zones;
+              const defaultZones = existingZones || createDefaultZones(3);
+              updateConfig({
+                historicalConfig: {
+                  ...config.historicalConfig!,
+                  convexityZones: {
+                    ...config.historicalConfig?.convexityZones,
+                    zoneStrategy: 'zones',
+                    zones: defaultZones
+                  }
+                }
+              });
+            }}
+            disabled={disabled}
+            className={`p-4 rounded-lg border-2 text-left transition-colors ${
+              config.historicalConfig?.convexityZones?.zoneStrategy === 'zones' || 
+              (!config.historicalConfig?.convexityZones?.zoneStrategy && config.historicalConfig?.approach === 'zone_based')
+                ? 'border-green-500 bg-green-50'
+                : 'border-gray-200 hover:border-green-300'
+            }`}
+          >
+            <div className="font-medium text-green-800">Convexity Zones</div>
+            <div className="text-xs text-green-600 mt-1">
+              Different betas for rate regimes
+            </div>
+            <div className="mt-2 text-xs text-green-700">
+              ✓ Captures non-linear sensitivities
+            </div>
+          </button>
+          
+          <button
+            onClick={() => updateConfig({
+              historicalConfig: {
+                ...config.historicalConfig!,
+                convexityZones: { zoneStrategy: 'through_cycle' },
+                approach: 'through_cycle'
+              }
+            })}
+            disabled={disabled}
+            className={`p-4 rounded-lg border-2 text-left transition-colors ${
+              config.historicalConfig?.convexityZones?.zoneStrategy === 'through_cycle' ||
+              config.historicalConfig?.approach === 'through_cycle'
+                ? 'border-purple-500 bg-purple-50'
+                : 'border-gray-200 hover:border-purple-300'
+            }`}
+          >
+            <div className="font-medium text-purple-800">Through-the-Cycle</div>
+            <div className="text-xs text-purple-600 mt-1">
+              Rate-specific beta mapping
+            </div>
+            <div className="mt-2 text-xs text-purple-700">
+              ✓ Granular calibration
+            </div>
+          </button>
+        </div>
+      </div>
+
+      {/* Zone Count Selector - only show if zones strategy is selected */}
+      {(config.historicalConfig?.convexityZones?.zoneStrategy === 'zones' ||
+        (!config.historicalConfig?.convexityZones?.zoneStrategy && config.historicalConfig?.approach === 'zone_based')) && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <h5 className="text-sm font-medium text-green-900 mb-3">Zone Configuration</h5>
+          
+          {/* Zone Count Selector */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-green-700 mb-2">
+              Number of Convexity Zones
+            </label>
+            <div className="flex space-x-3">
+              {[2, 3, 4, 5].map(count => {
+                const currentZoneCount = config.historicalConfig?.convexityZones?.zones?.length || 3;
+                return (
+                  <button
+                    key={count}
+                    onClick={() => {
+                      const newZones = createDefaultZones(count);
+                      updateConfig({
+                        historicalConfig: {
+                          ...config.historicalConfig!,
+                          convexityZones: {
+                            ...config.historicalConfig?.convexityZones,
+                            zones: newZones
+                          }
+                        }
+                      });
+                    }}
+                    disabled={disabled}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      currentZoneCount === count
+                        ? 'bg-green-600 text-white'
+                        : 'bg-white text-green-700 border border-green-300 hover:bg-green-100'
+                    }`}
+                  >
+                    {count} Zones
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-green-600 mt-2">
+              {config.historicalConfig?.convexityZones?.zones?.length === 2 && "Simple low/high rate environments"}
+              {config.historicalConfig?.convexityZones?.zones?.length === 3 && "Classic low/medium/high zones (recommended)"}
+              {config.historicalConfig?.convexityZones?.zones?.length === 4 && "Granular regime modeling"}
+              {config.historicalConfig?.convexityZones?.zones?.length === 5 && "Very detailed rate cycle analysis"}
+            </p>
+          </div>
+          
+          {/* Zone Names and Thresholds */}
+          {config.historicalConfig?.convexityZones?.zones && (
+            <div className="space-y-3">
+              <h6 className="text-sm font-medium text-green-800">Zone Names & Thresholds</h6>
+              {config.historicalConfig.convexityZones.zones.map((zone, index) => (
+                <div key={zone.id} className="flex items-center space-x-3 bg-white rounded border border-green-200 p-3">
+                  <div 
+                    className="w-4 h-4 rounded-full"
+                    style={{ backgroundColor: zone.color }}
+                  />
+                  <div className="flex-1">
+                    <input
+                      type="text"
+                      value={zone.name}
+                      onChange={(e) => {
+                        const updatedZones = [...config.historicalConfig!.convexityZones!.zones!];
+                        updatedZones[index] = { ...zone, name: e.target.value };
+                        updateConfig({
+                          historicalConfig: {
+                            ...config.historicalConfig!,
+                            convexityZones: {
+                              ...config.historicalConfig!.convexityZones!,
+                              zones: updatedZones
+                            }
+                          }
+                        });
+                      }}
+                      disabled={disabled}
+                      className="w-full px-2 py-1 text-sm border border-green-300 rounded focus:ring-green-500 focus:border-green-500"
+                      placeholder={`Zone ${index + 1} name`}
+                    />
+                  </div>
+                  {zone.threshold !== undefined && (
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs text-green-600">Max BoE Rate:</span>
+                      <input
+                        type="number"
+                        value={zone.threshold}
+                        onChange={(e) => {
+                          const value = parseFloat(e.target.value);
+                          const updatedZones = [...config.historicalConfig!.convexityZones!.zones!];
+                          updatedZones[index] = { ...zone, threshold: value };
+                          updateConfig({
+                            historicalConfig: {
+                              ...config.historicalConfig!,
+                              convexityZones: {
+                                ...config.historicalConfig!.convexityZones!,
+                                zones: updatedZones
+                              }
+                            }
+                          });
+                        }}
+                        disabled={disabled}
+                        min="0"
+                        max="10"
+                        step="0.25"
+                        className="w-20 px-2 py-1 text-sm border border-green-300 rounded focus:ring-green-500 focus:border-green-500"
+                      />
+                      <span className="text-xs text-green-600">%</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Historical Approach Selection - only show if not through-cycle */}
+      {config.historicalConfig?.convexityZones?.zoneStrategy !== 'through_cycle' && 
+       config.historicalConfig?.approach !== 'through_cycle' && (
+        <div>
+        <h4 className="text-lg font-semibold text-gray-900 mb-3">Historical Approach</h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <button
+            onClick={() => selectApproach('zone_based')}
+            disabled={disabled}
+            className={`p-4 rounded-lg border-2 text-left transition-colors ${
+              config.historicalConfig?.approach === 'zone_based' || !config.historicalConfig?.approach
+                ? 'border-green-500 bg-green-50'
+                : 'border-gray-200 hover:border-green-300'
+            }`}
+          >
+            <div className="font-medium text-green-800">Zone-Based Calibration</div>
+            <div className="text-xs text-green-600 mt-1">
+              Set convexity zones, then calculate zone-specific betas
+            </div>
+            <div className="mt-2 text-xs text-green-700">
+              ✓ Visual zone validation with beta chart
+            </div>
+          </button>
+          
+          <button
+            onClick={() => selectApproach('through_cycle')}
+            disabled={disabled}
+            className={`p-4 rounded-lg border-2 text-left transition-colors ${
+              config.historicalConfig?.approach === 'through_cycle'
+                ? 'border-purple-500 bg-purple-50'
+                : 'border-gray-200 hover:border-purple-300'
+            }`}
+          >
+            <div className="font-medium text-purple-800">Through-the-Cycle</div>
+            <div className="text-xs text-purple-600 mt-1">
+              Map each BoE rate level to its historical beta
+            </div>
+            <div className="mt-2 text-xs text-purple-700">
+              ✓ Granular rate-specific calibration
+            </div>
+          </button>
+        </div>
+      )}
+
+      {/* Zone-Based Configuration */}
+      {(config.historicalConfig?.convexityZones?.zoneStrategy === 'zones' ||
+        (!config.historicalConfig?.convexityZones?.zoneStrategy && config.historicalConfig?.approach === 'zone_based')) && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <h4 className="text-lg font-semibold text-green-900 mb-4 flex items-center">
+            <ChartBarIcon className="w-5 h-5 mr-2" />
+            Convexity Zone Configuration
+          </h4>
+          
+          {/* Manual Zone Configuration */}
+          <div className="mb-4">
+            <p className="text-sm text-green-800 mb-3">
+              Set convexity zones based on BoE rate levels where you expect different beta sensitivities.
+            </p>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-green-700 mb-2">
+                  Low → Medium Zone Threshold (BoE Rate %)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="10"
+                  step="0.25"
+                  value={config.historicalConfig.convexityZones?.lowToMidThreshold || 3.0}
+                  onChange={(e) => {
+                    const value = parseFloat(e.target.value);
+                    updateConfig({
+                      historicalConfig: {
+                        ...config.historicalConfig!,
+                        convexityZones: {
+                          ...config.historicalConfig!.convexityZones!,
+                          lowToMidThreshold: value
+                        }
+                      }
+                    });
+                  }}
+                  disabled={disabled}
+                  className="w-full px-3 py-2 border border-green-300 rounded focus:ring-green-500 focus:border-green-500"
+                />
+                <p className="text-xs text-green-600 mt-1">
+                  Rate level where sensitivity begins to change
+                </p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-green-700 mb-2">
+                  Medium → High Zone Threshold (BoE Rate %)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="10"
+                  step="0.25"
+                  value={config.historicalConfig.convexityZones?.midToHighThreshold || 5.0}
+                  onChange={(e) => {
+                    const value = parseFloat(e.target.value);
+                    updateConfig({
+                      historicalConfig: {
+                        ...config.historicalConfig!,
+                        convexityZones: {
+                          ...config.historicalConfig!.convexityZones!,
+                          midToHighThreshold: value
+                        }
+                      }
+                    });
+                  }}
+                  disabled={disabled}
+                  className="w-full px-3 py-2 border border-green-300 rounded focus:ring-green-500 focus:border-green-500"
+                />
+                <p className="text-xs text-green-600 mt-1">
+                  Rate level where sensitivity changes again
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Tier-Specific Zone Configuration Toggle */}
+          <div className="mb-4">
+            <div className="flex items-center space-x-3">
+              <input
+                type="checkbox"
+                id="tierSpecificZones"
+                checked={tierSpecificZones}
+                onChange={(e) => setTierSpecificZones(e.target.checked)}
+                disabled={disabled}
+                className="w-4 h-4 text-green-600 border-green-300 rounded focus:ring-green-500"
+              />
+              <label htmlFor="tierSpecificZones" className="text-sm text-green-800 font-medium">
+                Configure different convexity zones for each product tier
+              </label>
+            </div>
+            <p className="text-xs text-green-600 mt-1 ml-7">
+              Enable this to set separate zone boundaries for each tier (e.g., Tier 1 and Tier 2 may have different rate sensitivities)
+            </p>
+          </div>
+
+          {/* Tier-Specific Zone Configuration */}
+          {tierSpecificZones && (
+            <div className="mb-4 bg-green-100 border border-green-300 rounded-lg p-4">
+              <h5 className="text-sm font-medium text-green-900 mb-3">Tier-Specific Zone Configuration</h5>
+              {currentProduct?.tiers?.map((tier, index) => (
+                <div key={tier.tier_name} className="mb-4 bg-white rounded border border-green-200 p-3">
+                  <h6 className="text-sm font-medium text-green-900 mb-3">{tier.tier_name} Zones</h6>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-green-700 mb-2">
+                        Low → Medium Threshold (BoE Rate %)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="10"
+                        step="0.25"
+                        defaultValue={3.0}
+                        disabled={disabled}
+                        className="w-full px-3 py-2 border border-green-300 rounded focus:ring-green-500 focus:border-green-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-green-700 mb-2">
+                        Medium → High Threshold (BoE Rate %)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="10"
+                        step="0.25"
+                        defaultValue={5.0}
+                        disabled={disabled}
+                        className="w-full px-3 py-2 border border-green-300 rounded focus:ring-green-500 focus:border-green-500"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-green-600 mt-2">
+                    Current Rate: {tier.rate}% | Balance Range: {tier.balance_range}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Date Range Controls */}
+          <div className="mb-4 bg-white border border-green-300 rounded-lg p-4">
+            <h5 className="text-sm font-medium text-green-900 mb-3">Chart Time Range</h5>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-green-700 mb-2">
+                  Start Date
+                </label>
+                <input
+                  type="date"
+                  value={chartDateRange.startDate}
+                  onChange={(e) => setChartDateRange(prev => ({ ...prev, startDate: e.target.value }))}
+                  disabled={disabled}
+                  className="w-full px-3 py-2 border border-green-300 rounded focus:ring-green-500 focus:border-green-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-green-700 mb-2">
+                  End Date
+                </label>
+                <input
+                  type="date"
+                  value={chartDateRange.endDate}
+                  onChange={(e) => setChartDateRange(prev => ({ ...prev, endDate: e.target.value }))}
+                  disabled={disabled}
+                  className="w-full px-3 py-2 border border-green-300 rounded focus:ring-green-500 focus:border-green-500"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-green-600 mt-2">
+              Adjust the time range to focus on specific periods of the BoE rate cycle
+            </p>
+          </div>
+
+          {/* Beta Chart with Zone Visualization */}
+          <div className="bg-white rounded-lg border border-green-300 p-4">
+            {isLoadingData && (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600"></div>
+                <span className="ml-2 text-sm text-green-700">Loading historical data...</span>
+              </div>
+            )}
+            
+            <BetaZoneChart
+              data={transformDataForChart()}
+              zones={config.historicalConfig.convexityZones?.zones}
+              lowToMidThreshold={config.historicalConfig.convexityZones?.lowToMidThreshold || 3.0}
+              midToHighThreshold={config.historicalConfig.convexityZones?.midToHighThreshold || 5.0}
+              onZonesChange={(zones) => {
+                updateConfig({
+                  historicalConfig: {
+                    ...config.historicalConfig!,
+                    convexityZones: {
+                      ...config.historicalConfig!.convexityZones!,
+                      zones
+                    }
+                  }
+                });
+              }}
+              onThresholdChange={(lowToMid: number, midToHigh: number) => {
+                updateConfig({
+                  historicalConfig: {
+                    ...config.historicalConfig!,
+                    convexityZones: {
+                      ...config.historicalConfig!.convexityZones!,
+                      lowToMidThreshold: lowToMid,
+                      midToHighThreshold: midToHigh
+                    }
+                  }
+                });
+              }}
+              onCommitZones={() => {
+                console.log('Step 3 - Zones committed:', {
+                  zones: config.historicalConfig?.convexityZones?.zones,
+                  lowToMid: config.historicalConfig?.convexityZones?.lowToMidThreshold,
+                  midToHigh: config.historicalConfig?.convexityZones?.midToHighThreshold
+                });
+              }}
+              editable={true}
+              height={700}
+              availableTiers={currentProduct?.tiers?.map(tier => tier.tier_name) || ['Tier 1', 'Tier 2']}
+              useRateThresholds={true}
+              zoneStrategy={config.historicalConfig?.convexityZones?.zoneStrategy || 'zones'}
+            />
+            
+            
+            {historicalData.length > 0 && (
+              <div className="mt-2 space-y-1">
+                <div className="text-xs text-green-600">
+                  📊 Displaying {historicalData.length} historical rate records for {currentProduct?.bank_code}
+                  {historicalData[0]?.source === 'sample_demo' && (
+                    <span className="ml-2 text-orange-600">(Sample data for demonstration)</span>
+                  )}
+                </div>
+                <div className="text-xs text-blue-600">
+                  📈 Rate cycle: BoE 0.1% (Mar 2020) → 5.25% (Aug 2023) - Perfect for beta sensitivity analysis
+                </div>
+                <div className="text-xs text-gray-500">
+                  Chart shows {historicalData[0]?.source === 'sample_demo' ? 'realistic' : 'actual'} product rate response to BoE rate hiking cycle from COVID lows to current levels
+                </div>
+              </div>
+            )}
+          </div>
+
+          {!config.historicalConfig.convexityZones?.autoDetect && (
+            <div className="mt-4 bg-green-100 border border-green-300 rounded p-3">
+              <div className="flex items-start space-x-2">
+                <InformationCircleIcon className="w-4 h-4 text-green-600 mt-0.5" />
+                <div className="text-xs text-green-800">
+                  <strong>Manual Zone Setting:</strong> Use the sliders below the chart to adjust zone boundaries. 
+                  Look for clear differences in beta behavior between zones. The chart shows historical 
+                  beta sensitivity patterns that will guide the calibration.
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Through-Cycle Configuration */}
+      {config.historicalConfig?.approach === 'through_cycle' && (
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+          <h4 className="text-lg font-semibold text-purple-900 mb-4">Through-Cycle Settings</h4>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-purple-700 mb-2">Rate Step Size</label>
+              <select
+                value={config.historicalConfig?.throughCycle?.rateStepSize ?? 0.25}
+                onChange={(e) => updateThroughCycleConfig({ rateStepSize: Number(e.target.value) })}
+                disabled={disabled}
+                className="w-full px-3 py-2 border border-purple-300 rounded focus:ring-purple-500 focus:border-purple-500"
+              >
+                <option value={0.1}>0.10% (fine granularity)</option>
+                <option value={0.25}>0.25% (standard)</option>
+                <option value={0.5}>0.50% (coarse granularity)</option>
+              </select>
+            </div>
+            
+            <div className="flex items-center space-x-3">
+              <input
+                type="checkbox"
+                id="smoothingEnabled"
+                checked={config.historicalConfig?.throughCycle?.smoothing ?? true}
+                onChange={(e) => updateThroughCycleConfig({ smoothing: e.target.checked })}
+                disabled={disabled}
+                className="w-4 h-4 text-purple-600 border-purple-300 rounded focus:ring-purple-500"
+              />
+              <label htmlFor="smoothingEnabled" className="text-sm text-purple-800">
+                Apply smoothing to reduce noise in beta calculations
+              </label>
+            </div>
+          </div>
+          
+          <div className="mt-4 bg-purple-100 border border-purple-300 rounded p-3">
+            <p className="text-xs text-purple-800">
+              <strong>Through-Cycle Approach:</strong> Each BoE rate level gets its own historically-calibrated 
+              beta coefficient. This provides more granular and empirically-driven rate sensitivity mapping 
+              without arbitrary zone boundaries.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Validation Errors */}
+      {validationErrors.length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-start space-x-3">
+            <ExclamationTriangleIcon className="w-5 h-5 text-red-600 mt-0.5" />
+            <div>
+              <h4 className="text-red-800 font-medium">Configuration Issues:</h4>
+              <ul className="text-red-700 text-sm mt-1 list-disc list-inside">
+                {validationErrors.map((error, index) => (
+                  <li key={index}>{error}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

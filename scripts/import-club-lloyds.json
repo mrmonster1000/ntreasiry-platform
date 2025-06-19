@@ -1,0 +1,52 @@
+{
+  "data": [
+    {
+      "bank_code": "LLOYDS",
+      "product_name": "Club Lloyds Current Account",
+      "product_type": "instant_access_savings",
+      "rate": 0.60,
+      "date": "2023-01-15",
+      "effective_from": "2020-10-01",
+      "effective_to": "2023-01-30",
+      "is_future_rate": false,
+      "source": "historical_import",
+      "notes": "Club Lloyds COVID-era - Tier 1 rate"
+    },
+    {
+      "bank_code": "LLOYDS",
+      "product_name": "Club Lloyds Current Account", 
+      "product_type": "instant_access_savings",
+      "rate": 1.50,
+      "date": "2023-01-15",
+      "effective_from": "2020-10-01",
+      "effective_to": "2023-01-30",
+      "is_future_rate": false,
+      "source": "historical_import",
+      "notes": "Club Lloyds COVID-era - Tier 2 rate"
+    },
+    {
+      "bank_code": "LLOYDS",
+      "product_name": "Club Lloyds Current Account",
+      "product_type": "instant_access_savings", 
+      "rate": 1.00,
+      "date": "2020-09-15",
+      "effective_from": "2019-10-01",
+      "effective_to": "2020-09-30",
+      "is_future_rate": false,
+      "source": "historical_import",
+      "notes": "Club Lloyds pre-COVID - Tier 1 rate"
+    },
+    {
+      "bank_code": "LLOYDS",
+      "product_name": "Club Lloyds Current Account",
+      "product_type": "instant_access_savings",
+      "rate": 2.00,
+      "date": "2020-09-15", 
+      "effective_from": "2019-10-01",
+      "effective_to": "2020-09-30",
+      "is_future_rate": false,
+      "source": "historical_import",
+      "notes": "Club Lloyds pre-COVID - Tier 2 rate"
+    }
+  ]
+}
