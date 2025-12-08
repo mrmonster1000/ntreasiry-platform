@@ -8,6 +8,8 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        'neuro-green': '#0d2818',
+        'neuro-offwhite': '#f5f5f5',
         primary: {
           50: '#eff6ff',
           500: '#3b82f6',
@@ -29,6 +31,10 @@ module.exports = {
           500: '#ef4444',
           600: '#dc2626',
         },
+      },
+      fontFamily: {
+        fraunces: ['Fraunces', 'serif'],
+        inter: ['Inter', 'system-ui', 'sans-serif'],
       },
     },
   },
