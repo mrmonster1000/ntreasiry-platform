@@ -6,7 +6,28 @@ import { Toaster } from 'react-hot-toast';
 
 export const metadata: Metadata = {
   title: 'Neuro-XI | Data, Research, Intelligence',
-  description: 'Data, Research, Intelligence',
+  description: 'Neuro-XI delivers data-driven research and intelligence solutions.',
+  keywords: ['data', 'research', 'intelligence', 'Neuro-XI'],
+  authors: [{ name: 'Neuro-XI' }],
+  openGraph: {
+    title: 'Neuro-XI',
+    description: 'Data, Research, Intelligence',
+    url: 'https://neuro-xi.com',
+    siteName: 'Neuro-XI',
+    locale: 'en_GB',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'Neuro-XI',
+    description: 'Data, Research, Intelligence',
+  },
+  icons: {
+    icon: '/favicon.svg',
+    shortcut: '/favicon.svg',
+    apple: '/favicon.svg',
+  },
+  metadataBase: new URL('https://neuro-xi.com'),
 };
 
 export default function RootLayout({
