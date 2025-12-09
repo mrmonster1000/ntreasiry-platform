@@ -8,7 +8,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        'neuro-green': '#0d2818',
+        'neuro-green': '#061a0f',
         'neuro-offwhite': '#f5f5f5',
         primary: {
           50: '#eff6ff',
