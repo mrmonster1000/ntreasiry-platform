@@ -16,10 +16,10 @@ export default function HomePage() {
       {/* Contact */}
       <footer className="absolute bottom-8 sm:bottom-12">
         <a
-          href="mailto:contact@neuro-xi.com"
+          href="mailto:hello@neuro-xi.com"
           className="font-inter text-neuro-offwhite text-sm tracking-wide hover:opacity-80"
         >
-          contact@neuro-xi.com
+          hello@neuro-xi.com
         </a>
       </footer>
     </main>
