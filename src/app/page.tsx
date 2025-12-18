@@ -786,7 +786,7 @@ export default function PenguinEggPage() {
       <header>
         <nav role="navigation" aria-label="Main navigation">
           <a href="#" className="logo" aria-label="Penguin Egg - Home">
-            <img src="/penguin-logo.svg" alt="Penguin Egg logo" className="logo-icon" width={48} height={48} />
+            <img src="/penguin-logo.png" alt="Penguin Egg logo" className="logo-icon" width={48} height={48} />
             <span className="logo-text">Penguin Egg</span>
           </a>
           <button
@@ -1343,7 +1343,7 @@ export default function PenguinEggPage() {
           <div className="footer-top">
             <div className="footer-brand">
               <a href="#" className="logo" aria-label="Penguin Egg - Home">
-                <img src="/penguin-logo.svg" alt="" className="logo-icon" width={48} height={48} style={{ filter: 'brightness(10)' }} />
+                <img src="/penguin-logo.png" alt="" className="logo-icon" width={48} height={48} style={{ filter: 'brightness(10)' }} />
                 <span className="logo-text" style={{ color: 'white' }}>Penguin Egg</span>
               </a>
               <p>We compare mortgages and savings rates so you don&apos;t have to. Like a penguin dad, we&apos;ve got one job: keeping your financial egg safe.</p>
