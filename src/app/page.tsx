@@ -150,10 +150,11 @@ export default function PenguinEggPage() {
         .hero h1 {
           font-family: 'Fraunces', Georgia, serif;
           font-size: 3.5rem;
-          font-weight: 700;
+          font-weight: 800;
           color: var(--penguin-dark);
           margin-bottom: 1.5rem;
-          line-height: 1.1;
+          line-height: 1.05;
+          letter-spacing: -0.02em;
         }
 
         .hero h1 span {
@@ -173,12 +174,14 @@ export default function PenguinEggPage() {
           display: inline-flex;
           align-items: center;
           gap: 8px;
-          background: var(--egg-warm);
-          padding: 8px 16px;
-          border-radius: 100px;
-          font-size: 0.9rem;
+          background: transparent;
+          padding: 0;
+          font-size: 0.8rem;
+          font-weight: 600;
           color: var(--egg-gold-dark);
-          margin-bottom: 2rem;
+          margin-bottom: 1.5rem;
+          text-transform: uppercase;
+          letter-spacing: 0.15em;
         }
 
         /* Tab Navigation */
@@ -247,9 +250,10 @@ export default function PenguinEggPage() {
 
         .section-title {
           font-family: 'Fraunces', Georgia, serif;
-          font-size: 1.75rem;
-          font-weight: 700;
+          font-size: 2rem;
+          font-weight: 800;
           color: var(--penguin-dark);
+          letter-spacing: -0.01em;
         }
 
         .last-updated {
@@ -292,11 +296,11 @@ export default function PenguinEggPage() {
         }
 
         .filter-label {
-          font-size: 0.8rem;
+          font-size: 0.7rem;
           font-weight: 600;
           color: var(--text-secondary);
           text-transform: uppercase;
-          letter-spacing: 0.5px;
+          letter-spacing: 0.1em;
         }
 
         .filter-select, .filter-input {
@@ -421,10 +425,10 @@ export default function PenguinEggPage() {
         }
 
         .rate-label {
-          font-size: 0.75rem;
+          font-size: 0.7rem;
           color: var(--text-secondary);
           text-transform: uppercase;
-          letter-spacing: 0.5px;
+          letter-spacing: 0.1em;
         }
 
         .rate-value {
@@ -562,8 +566,9 @@ export default function PenguinEggPage() {
         .trust-number {
           font-family: 'Fraunces', Georgia, serif;
           font-size: 2.5rem;
-          font-weight: 700;
+          font-weight: 800;
           margin-bottom: 0.5rem;
+          letter-spacing: -0.02em;
         }
 
         .trust-label {
@@ -586,9 +591,10 @@ export default function PenguinEggPage() {
         .how-it-works h2 {
           font-family: 'Fraunces', Georgia, serif;
           font-size: 2.5rem;
-          font-weight: 700;
+          font-weight: 800;
           color: var(--penguin-dark);
           margin-bottom: 1rem;
+          letter-spacing: -0.02em;
         }
 
         .how-it-works > div > p {
@@ -621,7 +627,7 @@ export default function PenguinEggPage() {
         .step h3 {
           font-family: 'Fraunces', Georgia, serif;
           font-size: 1.25rem;
-          font-weight: 700;
+          font-weight: 800;
           color: var(--penguin-dark);
           margin-bottom: 0.75rem;
         }
