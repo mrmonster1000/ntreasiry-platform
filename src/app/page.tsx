@@ -38,7 +38,7 @@ export default function PenguinEggPage() {
         }
 
         body {
-          font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
           background: var(--ice-white);
           color: var(--text-primary);
           line-height: 1.6;
@@ -76,7 +76,7 @@ export default function PenguinEggPage() {
         }
 
         .logo-text {
-          font-family: Georgia, 'Times New Roman', serif;
+          font-family: 'Fraunces', Georgia, serif;
           font-weight: 700;
           font-size: 1.5rem;
           color: var(--penguin-dark);
@@ -148,7 +148,7 @@ export default function PenguinEggPage() {
         }
 
         .hero h1 {
-          font-family: Georgia, 'Times New Roman', serif;
+          font-family: 'Fraunces', Georgia, serif;
           font-size: 3.5rem;
           font-weight: 700;
           color: var(--penguin-dark);
@@ -246,7 +246,7 @@ export default function PenguinEggPage() {
         }
 
         .section-title {
-          font-family: Georgia, 'Times New Roman', serif;
+          font-family: 'Fraunces', Georgia, serif;
           font-size: 1.75rem;
           font-weight: 700;
           color: var(--penguin-dark);
@@ -560,7 +560,7 @@ export default function PenguinEggPage() {
         }
 
         .trust-number {
-          font-family: Georgia, 'Times New Roman', serif;
+          font-family: 'Fraunces', Georgia, serif;
           font-size: 2.5rem;
           font-weight: 700;
           margin-bottom: 0.5rem;
@@ -584,7 +584,7 @@ export default function PenguinEggPage() {
         }
 
         .how-it-works h2 {
-          font-family: Georgia, 'Times New Roman', serif;
+          font-family: 'Fraunces', Georgia, serif;
           font-size: 2.5rem;
           font-weight: 700;
           color: var(--penguin-dark);
@@ -619,7 +619,7 @@ export default function PenguinEggPage() {
         }
 
         .step h3 {
-          font-family: Georgia, 'Times New Roman', serif;
+          font-family: 'Fraunces', Georgia, serif;
           font-size: 1.25rem;
           font-weight: 700;
           color: var(--penguin-dark);
@@ -781,7 +781,7 @@ export default function PenguinEggPage() {
         }
       `}</style>
 
-      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+      <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
       <header>
         <nav role="navigation" aria-label="Main navigation">
